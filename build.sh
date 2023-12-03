@@ -1,0 +1,1 @@
+gcc -shared -fPIC ldkit.c -o ldkit.so -ldl
