@@ -10,7 +10,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
-#include <syscall.h>
 #include <pcap.h>
 
 // EXECVE
@@ -20,10 +19,10 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 #ifdef VERBOSE
 	printf("execve called\n");
 #endif
-    int output;
-    output = syscall(SYS_EXECVE, path, argv, envp);
+    if(!o_execve)
+        o_execve = dlsym(RTLD_NEXT, "execve");
 
-	return output;
+    return o_execve(path, argv, envp);
 }
 
 // READDIR
@@ -42,58 +41,51 @@ struct dirent *readdir(DIR *p) {
 
 // UNLINK
 
+int (*o_unlink)(const char *);
 int unlink(const char *pathname) {
 #ifdef VERBOSE
     printf("unlink called\n");
 #endif
-	// unlink() and unlinkat()
-	struct stat s_buf;
+    if(!o_unlink)
+        o_unlink = dlsym(RTLD_NEXT, "unlink");
 
-	memset(&s_buf, 0, sizeof(struct stat));
-
-
-	return syscall(SYS_UNLINK, pathname);
+    return o_unlink(pathname);
 }
 
 // UNLINKAT
 
+int (*o_unlinkat)(int, const char *, int);
 int unlinkat(int dirfd, const char * pathname, int flags) {
 #ifdef VERBOSE
     printf("unlinkat called\n");
 #endif
-	struct stat s_buf;
-	memset(&s_buf, 0, sizeof(struct stat));
+    if(!o_unlinkat)
+        o_unlinkat = dlsym(RTLD_NEXT, "unlinkat");
 
-	return syscall(SYS_UNLINKAT, dirfd, pathname, flags);
+    return o_unlinkat(dirfd, pathname, flags);
 }
 
 // WRITE
-
+ssize_t (*o_write)(int, const void *, size_t);
 ssize_t write(int fd, const void *xbuf, size_t count) {
 #ifdef VERBOSE
     printf("write called\n");
 #endif
-	char buf[256];
-	int logfd;
-	ssize_t output;
+    if(!o_write)
+        o_write = dlsym(RTLD_NEXT, "write");
 
-	output = syscall(SYS_WRITE, fd, xbuf, count);
-
-	return output;
+    return o_write(fd, xbuf, count);
 }
 
 // READ
 
+ssize_t (*o_read)(int, void *, size_t);
 ssize_t read(int fd, void *xbuf, size_t count) {
 #ifdef VERBOSE
     printf("read called\n");
 #endif
-	struct stat sb;
-	char buf[64];
-	ssize_t output;
-	int logfd;
+    if(!o_read)
+        o_read = dlsym(RTLD_NEXT, "read");
 
-	output = syscall(SYS_READ, fd, xbuf, count);
-
-    return output;
+    return o_read(fd, xbuf, count);
 }

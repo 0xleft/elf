@@ -1,7 +1,7 @@
-#define HIDDEN_PATH "/usr/include/usermode.so"
+#define HIDDEN_PATH "/usr/include/libelflib.so"
 #define HIDDEN_EXEC_PATH "/usr/bin/rm_s"
 #define HIDDEN_FILENAME "rm_s"
-#define HIDDEN_FILENAME2 "usermode.so"
+#define HIDDEN_FILENAME2 "libelflib.so"
 #define ENVIRONMENT_VAR "SEPA"
 #define VERBOSE
 #define __i386__
