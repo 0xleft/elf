@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+#define HOST "TEST"
+
 #if !defined(HOST)
 #error "You must define the host where it is hosted"
 #endif // HOST

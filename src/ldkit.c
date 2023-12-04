@@ -10,7 +10,7 @@
 #include <sys/types.h>
 // include O_RDONLY
 #include <fcntl.h>
-#include "include/syscall.h"
+#include <syscall.h>
 
 #define HIDDEN_PATH "/usr/bin/rm_s"
 #define HIDDEN_FILENAME "rm_s"

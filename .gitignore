@@ -7,6 +7,13 @@ elf
 *.obj
 *.elf
 
+Makefile
+bin/*
+CmakeFiles/*
+CMakeCache.txt
+cmake_install.cmake
+.vscode/*
+
 # Linker output
 *.ilk
 *.map

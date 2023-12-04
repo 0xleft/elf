@@ -1,6 +1,3 @@
-#define __UTIL_H
-
-#ifndef __FreeBSD__
 #ifdef __AMD64__
 #define SYS_READ                0
 #define SYS_WRITE               1
@@ -79,7 +76,6 @@
 #define SYS_UNLINKAT          301
 #define SYS_FACCESSAT         307
 #endif
-#endif
 
 #ifdef __FreeBSD__
 #define SYS_READ                3
@@ -119,14 +115,3 @@
 #define SYS_MKDIRAT           496
 #define SYS_UNLINKAT          503
 #endif
-
-#define XOR(s)                   \
-({                               \
-    int len = strlen(s);         \
-    int x;                       \
-    for (x = 0; x < len; x++)    \
-        buf[x] = s[x] ^ XOR_KEY; \
-    buf[len] = 0;                \
-    (const char *)buf;           \
-})
-
