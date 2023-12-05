@@ -1,6 +1,5 @@
 #define _GNU_SOURCE
 #include <config.h>
-
 #include <dlfcn.h>
 #include <dirent.h>
 #include <stdio.h>
@@ -36,6 +35,20 @@ struct dirent *readdir(DIR *p) {
         o_readdir = dlsym(RTLD_NEXT, "readdir");
 
     struct dirent *dir = o_readdir(p);
+    return dir;
+}
+
+// READDIR64
+
+struct dirent64 *(*o_readdir64)(DIR *);
+struct dirent64 *readdir64(DIR *p) {
+#ifdef VERBOSE
+    printf("readdir64 called\n");
+#endif
+    if(!o_readdir64)
+        o_readdir64 = dlsym(RTLD_NEXT, "readdir64");
+
+    struct dirent64 *dir = o_readdir64(p);
     return dir;
 }
 
@@ -88,4 +101,176 @@ ssize_t read(int fd, void *xbuf, size_t count) {
         o_read = dlsym(RTLD_NEXT, "read");
 
     return o_read(fd, xbuf, count);
+}
+
+// kill
+
+int (*o_kill)(pid_t, int);
+int kill(pid_t pid, int sig) {
+#ifdef VERBOSE
+    printf("kill called\n");
+#endif
+    if(!o_kill)
+        o_kill = dlsym(RTLD_NEXT, "kill");
+
+    return o_kill(pid, sig);
+}
+
+// openat
+
+int (*o_openat)(int, const char *, int, ...);
+int openat(int dirfd, const char *path, int flags, ...) {
+#ifdef VERBOSE
+    printf("openat called\n");
+#endif
+
+    if(!o_openat)
+        o_openat = dlsym(RTLD_NEXT, "openat");
+
+    return o_openat(dirfd, path, flags);
+}
+
+// openat64
+
+int (*o_openat64)(int, const char *, int, ...);
+int open64(const char *path, int flags, ...) {
+#ifdef VERBOSE
+    printf("openat64 called\n");
+#endif
+
+    if(!o_openat64)
+        o_openat64 = dlsym(RTLD_NEXT, "openat64");
+
+    return o_openat64(AT_FDCWD, path, flags);
+}
+
+// open
+
+int (*o_open)(const char *, int, ...);
+int open(const char *path, int flags, ...) {
+#ifdef VERBOSE
+    printf("open called\n");
+#endif
+    if(!o_open)
+        o_open = dlsym(RTLD_NEXT, "open");
+
+    return o_open(path, flags);
+}
+
+// fopen
+
+FILE *(*o_fopen)(const char *, const char *);
+FILE *fopen(const char *path, const char *mode) {
+#ifdef VERBOSE
+    printf("fopen called\n");
+#endif
+
+    if(!o_fopen)
+        o_fopen = dlsym(RTLD_NEXT, "fopen");
+
+    return o_fopen(path, mode);
+}
+
+// pathmatch
+
+int (*o_fnmatch)(const char *, const char *, int);
+int fnmatch(const char *pattern, const char *string, int flags) {
+#ifdef VERBOSE
+    printf("fnmatch called\n");
+#endif
+    if(!o_fnmatch)
+        o_fnmatch = dlsym(RTLD_NEXT, "fnmatch");
+
+    return o_fnmatch(pattern, string, flags);
+}
+
+//shutdown
+
+int (*o_shutdown)(int, int);
+int shutdown(int sockfd, int how) {
+#ifdef VERBOSE
+    printf("shutdown called\n");
+#endif
+    if(!o_shutdown)
+        o_shutdown = dlsym(RTLD_NEXT, "shutdown");
+
+    return o_shutdown(sockfd, how);
+}
+
+// opendir
+
+DIR *(*o_opendir)(const char *);
+DIR *opendir(const char *name) {
+#ifdef VERBOSE
+    printf("opendir called\n");
+#endif
+    if(!o_opendir)
+        o_opendir = dlsym(RTLD_NEXT, "opendir");
+
+    return o_opendir(name);
+}
+
+// stat
+
+int (*o_stat)(const char *, struct stat *);
+int stat(const char *pathname, struct stat *statbuf) {
+#ifdef VERBOSE
+    printf("stat called\n");
+#endif
+    if(!o_stat)
+        o_stat = dlsym(RTLD_NEXT, "stat");
+
+    return o_stat(pathname, statbuf);
+}
+
+// statfs
+
+int (*o_statfs)(const char *, struct statfs *);
+int statfs(const char *pathname, struct statfs *buf) {
+#ifdef VERBOSE
+    printf("statfs called\n");
+#endif
+    if(!o_statfs)
+        o_statfs = dlsym(RTLD_NEXT, "statfs");
+
+    return o_statfs(pathname, buf);
+}
+
+// xstat
+
+int (*o_xstat)(int, const char *, struct stat *);
+int __xstat(int ver, const char *pathname, struct stat *statbuf) {
+#ifdef VERBOSE
+    printf("xstat called\n");
+#endif
+    if(!o_xstat)
+        o_xstat = dlsym(RTLD_NEXT, "__xstat");
+
+    return o_xstat(ver, pathname, statbuf);
+}
+
+// lstat
+
+int (*o_lstat)(const char *, struct stat *);
+int lstat(const char *pathname, struct stat *statbuf) {
+#ifdef VERBOSE
+    printf("lstat called\n");
+#endif
+    if(!o_lstat)
+        o_lstat = dlsym(RTLD_NEXT, "lstat");
+
+    return o_lstat(pathname, statbuf);
+}
+
+// ioctl
+
+int (*o_ioctl)(int, unsigned long, ...);
+int ioctl(int fd, unsigned long request, ...) {
+#ifdef VERBOSE
+    printf("ioctl called\n");
+#endif
+    if(!o_ioctl)
+        o_ioctl = dlsym(RTLD_NEXT, "ioctl");
+
+    return o_ioctl(fd, request);
 }

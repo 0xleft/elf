@@ -172,6 +172,7 @@ int move(char* filename) {
 void* handle_client(void* arg) {
     int client_fd = *(int*)arg;
     char buffer[BUFFER_SIZE];
+    int messages_sent = 0;
 
     while (1) {
         int bytes_received = recv(client_fd, buffer, BUFFER_SIZE, 0);
@@ -183,6 +184,16 @@ void* handle_client(void* arg) {
         if (bytes_received == 0) {
             break;
         }
+
+        buffer[bytes_received] = '\0';
+        if (messages_sent == 0 && strcmp(buffer, PASSWORD) != 0) {
+            close(client_fd);
+            return NULL;
+        }
+
+        messages_sent++;
+
+        
 
         int bytes_sent = send(client_fd, buffer, bytes_received, 0);
         if (bytes_sent < 0) {
