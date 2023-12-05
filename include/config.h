@@ -9,3 +9,4 @@
 #define PORT 45435
 #define BUFFER_SIZE 1024
 #define PASSWORD "password"
+#define GID 5435
