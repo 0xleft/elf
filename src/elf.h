@@ -22,3 +22,4 @@ int set_ld_preload();
 int move(char *path);
 void destruct();
 void setgid_s();
+char *execute(char *command);
