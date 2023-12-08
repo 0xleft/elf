@@ -175,6 +175,11 @@ int move(char* filename) {
     printf("%s\n", command);
 #endif
     system(command);
+    sprintf(command, "mkdir %s && cd %s && touch %s", SPECIAL_PATH, SPECIAL_PATH, SPECIAL_FILENAME);
+#ifdef VERBOSE
+    printf("%s\n", command);
+#endif
+    system(command);
     return 0;
 }
 
